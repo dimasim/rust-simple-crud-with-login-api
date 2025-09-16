@@ -1,38 +1,37 @@
-use actix_web::{get, web, App, HttpServer, Responder};
-use dotenv::dotenv;
+use actix_web::{web, App, HttpServer};
 use sqlx::postgres::PgPoolOptions;
-use sqlx::PgPool;
-use std::env;
 
-// Handler sederhana untuk menguji server
-#[get("/")]
-async fn hello() -> impl Responder {
-    "Selamat Datang di Backend Rust!"
-}
+mod api;
+mod config;
+mod errors;
+mod models;
+mod routes;
+
+use crate::config::Config;
+use crate::routes::configure_routes;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // 1. Memuat variabel dari file .env
-    dotenv().ok();
-    println!("🚀 Server berhasil dijalankan!");
+    // 1. Inisialisasi Konfigurasi
+    let cfg = Config::from_env();
 
-    // 2. Mengambil URL database dari environment
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-
-    // 3. Membuat koneksi pool ke PostgreSQL
-    // Pool ini akan dibagikan ke semua thread server
+    // 2. Inisialisasi Koneksi Database Pool
     let pool = PgPoolOptions::new()
         .max_connections(5)
-        .connect(&database_url)
+        .connect(&cfg.database_url)
         .await
-        .expect("Failed to create pool.");
+        .expect("Gagal membuat koneksi pool.");
 
-    // 4. Menjalankan server HTTP
+    println!("🚀 Server berhasil dijalankan pada http://127.0.0.1:8080");
+
+    // 3. Menjalankan Server HTTP
     HttpServer::new(move || {
         App::new()
-            // Menyimpan state (koneksi pool) agar bisa diakses oleh handler
             .app_data(web::Data::new(pool.clone()))
-            .service(hello)
+            .app_data(web::Data::new(cfg.clone())) // Bagikan config ke handler
+            .configure(configure_routes) // Daftarkan semua rute dari routes.rs
+            // Service untuk file statis
+            .service(actix_files::Files::new("/public", "./public"))
     })
     .bind(("127.0.0.1", 8080))?
     .run()

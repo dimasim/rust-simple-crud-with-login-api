@@ -1,12 +1,23 @@
 [package]
 name = "my_rust_app"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 actix-web = "4"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 dotenv = "0.15"
+chrono = { version = "0.4", features = ["serde"] } # Untuk handle timestamp
 
-sqlx = { version = "0.7", features = [ "runtime-tokio-rustls", "postgres" ] }
+# Database
+sqlx = { version = "0.7", features = [ "runtime-tokio-rustls", "postgres", "chrono" ] }
+
+# Autentikasi & Keamanan
+jsonwebtoken = "9"
+bcrypt = "0.15"
+
+# Upload File
+actix-multipart = "0.6"
+futures-util = "0.3"
+uuid = { version = "1", features = ["v4"] }
