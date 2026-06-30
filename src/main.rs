@@ -1,10 +1,10 @@
 use actix_web::{web, App, HttpServer};
 use sqlx::postgres::PgPoolOptions;
 
-mod auth_middleware;
 mod config;
 mod errors;
 mod handlers;
+mod middleware;
 mod models;
 mod routes;
 

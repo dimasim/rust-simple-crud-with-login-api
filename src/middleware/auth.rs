@@ -1,13 +1,12 @@
-// src/auth_middleware.rs
 use actix_web::{
     dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
-    http, Error,
+    Error,
 };
 use futures_util::future::LocalBoxFuture;
 use jsonwebtoken::{decode, Validation, DecodingKey};
 use std::env;
 use std::future::{ready, Ready};
-use crate::handlers::Claims; // Gunakan struct Claims dari handlers
+use crate::handlers::auth::Claims; // Gunakan struct Claims dari handlers/auth
 
 pub struct Auth;
 

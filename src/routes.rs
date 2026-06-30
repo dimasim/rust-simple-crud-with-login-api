@@ -1,6 +1,9 @@
 use actix_web::web;
-use crate::handlers::{register, login, get_todos, create_todo, upload_todo_image};
-use crate::auth_middleware::Auth;
+use crate::handlers::{
+    auth::{register, login},
+    todos::{get_todos, create_todo, upload_todo_image},
+};
+use crate::middleware::Auth;
 
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(
