@@ -1,9 +1,10 @@
 use actix_web::{web, App, HttpServer};
 use sqlx::postgres::PgPoolOptions;
 
-mod api;
+mod auth_middleware;
 mod config;
 mod errors;
+mod handlers;
 mod models;
 mod routes;
 
@@ -21,6 +22,12 @@ async fn main() -> std::io::Result<()> {
         .connect(&cfg.database_url)
         .await
         .expect("Gagal membuat koneksi pool.");
+
+    // Jalankan migrasi database otomatis
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Gagal menjalankan migrasi database");
 
     println!("🚀 Server berhasil dijalankan pada http://127.0.0.1:8080");
 

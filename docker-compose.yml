@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: todo_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rust_app
+    ports:
+      - "5434:5432" # Map 5434 host port to 5432 container port, matching original .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rust_app"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: todo_web_app
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/rust_app
+      JWT_SECRET: rahasia-sekali-jangan-disebar
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./public:/app/public # Persist uploads folder
+
+volumes:
+  postgres_data:

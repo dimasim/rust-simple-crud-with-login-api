@@ -1,7 +1,7 @@
 // src/handlers.rs
 
-use actix_web::{web, post, HttpResponse, Responder,web::ReqData};
-use sqlx::PgPool;
+use actix_web::{web, get, post, HttpResponse, Responder, web::ReqData};
+use sqlx::{PgPool, Row};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use jsonwebtoken::{encode, Header, EncodingKey};
 use serde::{Serialize, Deserialize};
@@ -38,14 +38,13 @@ pub async fn register(
         Err(_) => return HttpResponse::InternalServerError().json("Gagal hash password"),
     };
 
-    let result = sqlx::query_as!(
-        User,
+    let result = sqlx::query_as::<_, User>(
         "INSERT INTO users (name, email, password) VALUES ($1, $2, $3)
-         RETURNING id, name, email, created_at, updated_at, deleted_at",
-        body.name,
-        body.email,
-        hashed_password
+         RETURNING id, name, email, created_at, updated_at, deleted_at"
     )
+    .bind(&body.name)
+    .bind(&body.email)
+    .bind(&hashed_password)
     .fetch_one(pool.get_ref())
     .await;
 
@@ -70,15 +69,19 @@ pub async fn login(
     pool: web::Data<PgPool>,
     body: web::Json<LoginUser>,
 ) -> impl Responder {
-    let user = match sqlx::query!("SELECT id, password FROM users WHERE email = $1", body.email)
+    let user_row = match sqlx::query("SELECT id, password FROM users WHERE email = $1")
+        .bind(&body.email)
         .fetch_optional(pool.get_ref())
         .await
     {
-        Ok(Some(user)) => user,
+        Ok(Some(row)) => row,
         _ => return HttpResponse::Unauthorized().json(serde_json::json!({"error": "Email atau password salah"})),
     };
 
-    if !verify(&body.password, &user.password).unwrap_or(false) {
+    let user_id: i32 = user_row.get("id");
+    let user_password_hash: String = user_row.get("password");
+
+    if !verify(&body.password, &user_password_hash).unwrap_or(false) {
         return HttpResponse::Unauthorized().json(serde_json::json!({"error": "Email atau password salah"}));
     }
 
@@ -89,7 +92,7 @@ pub async fn login(
         .timestamp();
 
     let claims = Claims {
-        sub: user.id,
+        sub: user_id,
         exp: exp as usize,
     };
     
@@ -105,11 +108,10 @@ pub async fn get_todos(
     user_id: ReqData<i32>, // Ambil user_id dari middleware
 ) -> impl Responder {
     let id = user_id.into_inner();
-    let result = sqlx::query_as!(
-        Todo,
-        "SELECT id, title, description, is_done, image_url, user_id, created_at FROM todos WHERE user_id = $1",
-        id
+    let result = sqlx::query_as::<_, Todo>(
+        "SELECT id, title, description, is_done, image_url, user_id, created_at FROM todos WHERE user_id = $1"
     )
+    .bind(id)
     .fetch_all(pool.get_ref())
     .await;
 
@@ -126,14 +128,13 @@ pub async fn create_todo(
     body: web::Json<CreateTodo>,
 ) -> impl Responder {
     let id = user_id.into_inner();
-    let result = sqlx::query_as!(
-        Todo,
+    let result = sqlx::query_as::<_, Todo>(
         "INSERT INTO todos (title, description, user_id) VALUES ($1, $2, $3)
-         RETURNING id, title, description, is_done, image_url, user_id, created_at",
-        body.title,
-        body.description,
-        id
+         RETURNING id, title, description, is_done, image_url, user_id, created_at"
     )
+    .bind(&body.title)
+    .bind(&body.description)
+    .bind(id)
     .fetch_one(pool.get_ref())
     .await;
 
@@ -164,13 +165,15 @@ pub async fn upload_todo_image(
     let todo_id = path.into_inner();
     
     // Verifikasi apakah todo ini milik user yang sedang login
-    let todo_check = sqlx::query!("SELECT user_id FROM todos WHERE id = $1", todo_id)
+    let todo_check = sqlx::query("SELECT user_id FROM todos WHERE id = $1")
+        .bind(todo_id)
         .fetch_optional(pool.get_ref())
         .await;
 
     match todo_check {
-        Ok(Some(record)) => {
-            if record.user_id != current_user_id {
+        Ok(Some(row)) => {
+            let todo_user_id: i32 = row.get("user_id");
+            if todo_user_id != current_user_id {
                 return HttpResponse::NotFound().json("Todo tidak ditemukan atau bukan milik anda");
             }
         },
@@ -202,13 +205,12 @@ pub async fn upload_todo_image(
             }
 
             // Update database
-            let result = sqlx::query_as!(
-                Todo,
+            let result = sqlx::query_as::<_, Todo>(
                 "UPDATE todos SET image_url = $1, updated_at = NOW() WHERE id = $2
-                 RETURNING id, title, description, is_done, image_url, user_id, created_at",
-                file_url,
-                todo_id
+                 RETURNING id, title, description, is_done, image_url, user_id, created_at"
             )
+            .bind(&file_url)
+            .bind(todo_id)
             .fetch_one(pool.get_ref())
             .await;
 
